@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Міст: браузер, DOM і fetch</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>Запит із браузера</h1>
+    <p>Уведіть ім’я, а потім знайдіть запит у DevTools Network.</p>
+
+    <form id="greeting-form">
+      <label for="name">Ім’я</label>
+      <input id="name" name="name" type="text" required>
+      <button type="submit">Надіслати</button>
+    </form>
+
+    <p id="result" aria-live="polite">Тут з’явиться відповідь API.</p>
+
+    <section aria-labelledby="history-heading">
+      <h2 id="history-heading">Історія відповідей</h2>
+      <ul id="history"></ul>
+    </section>
+  </main>
+</body>
+</html>

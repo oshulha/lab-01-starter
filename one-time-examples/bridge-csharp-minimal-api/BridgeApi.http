@@ -1,0 +1,29 @@
+@baseUrl = http://127.0.0.1:5077
+
+GET {{baseUrl}}/hello
+Accept: application/json
+
+###
+
+GET {{baseUrl}}/incidents?owner=olena
+Accept: application/json
+
+###
+
+GET {{baseUrl}}/incidents?owner=unknown
+Accept: application/json
+
+###
+
+GET {{baseUrl}}/incidents?owner=maksym
+Accept: application/json
+
+###
+
+GET {{baseUrl}}/incidents
+Accept: application/json
+
+###
+
+GET {{baseUrl}}/delayed-hello
+Accept: application/json
