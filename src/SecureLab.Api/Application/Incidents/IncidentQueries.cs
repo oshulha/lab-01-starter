@@ -3,10 +3,45 @@ using SecureLab.Api.Data;
 using SecureLab.Api.Data.Entities;
 using SecureLab.Api.Presentation.Contracts;
 
+using Microsoft.Extensions.Logging;
+
 namespace SecureLab.Api.Application.Incidents;
 
 public sealed class IncidentQueries(SecureLabDbContext dbContext, ILogger<IncidentQueries> logger)
 {
+    
+    private static readonly IncidentSeverity[] SeverityOrder =
+    [
+        IncidentSeverity.Low,
+        IncidentSeverity.Medium,
+        IncidentSeverity.High,
+        IncidentSeverity.Critical
+    ];
+
+    public async Task<IReadOnlyList<IncidentSeveritySummaryResponse>> GetSeveritySummaryAsync(
+        CancellationToken cancellationToken)
+    {
+        var grouped = await dbContext.Incidents
+            .AsNoTracking()
+            .GroupBy(incident => incident.Severity)
+            .Select(group => new { Severity = group.Key, Count = group.Count() })
+            .ToListAsync(cancellationToken);
+
+        var counts = grouped.ToDictionary(item => item.Severity, item => item.Count);
+
+        var result = SeverityOrder
+            .Select(severity => new IncidentSeveritySummaryResponse(
+                severity.ToString(),
+                counts.GetValueOrDefault(severity)))
+            .ToList();
+
+        logger.LogInformation(
+            "Built incident severity summary with {GroupCount} groups",
+            result.Count);
+
+        return result;
+    }
+    
     public async Task<IReadOnlyList<IncidentListItemResponse>> GetListAsync(
         IncidentStatus? status,
         CancellationToken cancellationToken)

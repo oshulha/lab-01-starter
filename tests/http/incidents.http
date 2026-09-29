@@ -1,3 +1,10 @@
+# GET /api/incidents/severity-summary
+# Тіла запиту немає.
+# 200 OK: [{ "severity": "...", "count": N }]
+# Політика: повний перелік рівнів (відсутні мають count: 0).
+# Порядок: за критичністю Low, Medium, High, Critical.
+# Заборонено: description, owner ID, email, коментарі.
+
 @host = http://localhost:5080
 @aliceIncidentId = 20000000-0000-0000-0000-000000000001
 
@@ -13,6 +20,10 @@ Accept: application/json
 GET {{host}}/api/incidents?status=Triaged
 Accept: application/json
 
+### Empty list: expected 200 with []
+GET {{host}}/api/incidents?status=Resolved
+Accept: application/json
+
 ### Existing details
 GET {{host}}/api/incidents/{{aliceIncidentId}}
 Accept: application/json
@@ -25,6 +36,9 @@ Accept: application/json
 GET {{host}}/api/incidents?status=Unknown
 Accept: application/json
 
-### Lab 1 extension point: expected 501 before student implementation
+### Lab 1 extension point: expected 200 after student implementation
+# Політика нульових груп: повний перелік рівнів (відсутні мають count: 0).
+# Порядок: за критичністю Low, Medium, High, Critical.
+# На baseline seed: Low 1, Medium 1, High 1, Critical 0.
 GET {{host}}/api/incidents/severity-summary
 Accept: application/json
