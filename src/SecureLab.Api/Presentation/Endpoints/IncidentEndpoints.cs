@@ -66,10 +66,27 @@ public static class IncidentEndpoints
     }
 
     private static async Task<IResult> GetSeveritySummaryAsync(
+        string? status,
         IncidentQueries queries,
         CancellationToken cancellationToken)
     {
-        var summary = await queries.GetSeveritySummaryAsync(cancellationToken);
+        IncidentStatus? parsedStatus = null;
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (!Enum.TryParse<IncidentStatus>(status, ignoreCase: false, out var value)
+                || !Enum.IsDefined(value))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["status"] = [$"Допустимі значення: {string.Join(", ", Enum.GetNames<IncidentStatus>())}."]
+                });
+            }
+
+            parsedStatus = value;
+        }
+
+        var summary = await queries.GetSeveritySummaryAsync(parsedStatus, cancellationToken);
         return Results.Ok(summary);
     }
 }
