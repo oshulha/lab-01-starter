@@ -3,6 +3,15 @@
 ### USB — перевірка встановлення
 GET {{api}}/api/incidents/search?q=USB
 
+### Контроль: значення без збігів
+GET {{api}}/api/incidents/search?q=zz-no-match
+
+### SQL-injection. Контрольний ввід (єдиний дозволений payload)
+GET {{api}}/api/incidents/search?q=zz-no-match%27%20OR%20TRUE%20--%20
+
+### Легітимний апостроф
+GET {{api}}/api/incidents/search?q=O%27Brien
+
 ### T-01 — коректне створення (очікується 201 + Location)
 POST {{api}}/api/incidents
 Content-Type: application/json
