@@ -1,5 +1,20 @@
 @api = http://localhost:5080
 
+### Retest: літеральний % (очікується 200 і [])
+GET {{api}}/api/incidents/search?q=%25
+
+### Sort: default (очікується 0004, 0005, 0003, 0002, 0001)
+GET {{api}}/api/incidents/search
+
+### Sort: severity (очікується 0002, 0001, потім 0003, 0004, 0005)
+GET {{api}}/api/incidents/search?sortBy=severity
+
+### Sort: status (очікується 0003, 0004, 0005, 0001, 0002)
+GET {{api}}/api/incidents/search?sortBy=status
+
+### Sort: невідоме значення (очікується 400, ключ sortBy)
+GET {{api}}/api/incidents/search?sortBy=price
+
 ### USB — перевірка встановлення
 GET {{api}}/api/incidents/search?q=USB
 
