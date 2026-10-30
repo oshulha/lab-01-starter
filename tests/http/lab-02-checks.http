@@ -1,0 +1,121 @@
+@api = http://localhost:5080
+
+### Retest: літеральний % (очікується 200 і [])
+GET {{api}}/api/incidents/search?q=%25
+
+### Sort: default (очікується 0004, 0005, 0003, 0002, 0001)
+GET {{api}}/api/incidents/search
+
+### Sort: severity (очікується 0002, 0001, потім 0003, 0004, 0005)
+GET {{api}}/api/incidents/search?sortBy=severity
+
+### Sort: status (очікується 0003, 0004, 0005, 0001, 0002)
+GET {{api}}/api/incidents/search?sortBy=status
+
+### Sort: невідоме значення (очікується 400, ключ sortBy)
+GET {{api}}/api/incidents/search?sortBy=price
+
+### USB — перевірка встановлення
+GET {{api}}/api/incidents/search?q=USB
+
+### Контроль: значення без збігів
+GET {{api}}/api/incidents/search?q=zz-no-match
+
+### SQL-injection. Контрольний ввід (єдиний дозволений payload)
+GET {{api}}/api/incidents/search?q=zz-no-match%27%20OR%20TRUE%20--%20
+
+### Легітимний апостроф
+GET {{api}}/api/incidents/search?q=O%27Brien
+
+### T-01 — коректне створення (очікується 201 + Location)
+POST {{api}}/api/incidents
+Content-Type: application/json
+
+{
+  "title": "  Підозріла активність у лабораторії ",
+  "description": "Виявлено незвичну активність у журналі комп'ютерного класу.",
+  "severity": "medium",
+  "occurredAtUtc": "2026-10-28T09:00:00+03:00"
+}
+
+### T-02 — кілька помилок одразу (очікується 400: title, description, severity, occurredAtUtc)
+POST {{api}}/api/incidents
+Content-Type: application/json
+
+{
+  "title": "   ",
+  "description": "   ",
+  "severity": "7"
+}
+
+### T-02 — severity "7" окремо (очікується 400, ключ severity)
+POST {{api}}/api/incidents
+Content-Type: application/json
+
+{
+  "title": "Severity probe",
+  "description": "Перевірка числового значення severity без урахування enum.",
+  "severity": "7",
+  "occurredAtUtc": "2026-10-27T10:00:00Z"
+}
+
+### T-02 — дата далеко в майбутньому (очікується 400, ключ occurredAtUtc)
+POST {{api}}/api/incidents
+Content-Type: application/json
+
+{
+  "title": "Future date probe",
+  "description": "Перевірка дати, що перевищує допустиме майбутнє.",
+  "severity": "Low",
+  "occurredAtUtc": "2099-01-01T00:00:00Z"
+}
+
+### T-03 — повторний title (очікується 409; виконуйте ПІСЛЯ T-01)
+POST {{api}}/api/incidents
+Content-Type: application/json
+
+{
+  "title": "Підозріла активність у лабораторії",
+  "description": "Другий запис із тим самим заголовком і тим самим регістром.",
+  "severity": "Low",
+  "occurredAtUtc": "2026-10-27T10:00:00Z"
+}
+
+### T-09 — High, 39 символів (очікується 400, ключ description)
+POST {{api}}/api/incidents
+Content-Type: application/json
+
+{
+  "title": "T-09 negative",
+  "description": "012345678901234567890123456789012345678",
+  "severity": "High",
+  "occurredAtUtc": "2026-10-27T10:00:00Z"
+}
+
+### T-09 — High, 40 символів (очікується 201)
+POST {{api}}/api/incidents
+Content-Type: application/json
+
+{
+  "title": "T-09 positive",
+  "description": "0123456789012345678901234567890123456789",
+  "severity": "High",
+  "occurredAtUtc": "2026-10-27T10:00:00Z"
+}
+
+### Overposting — зайві поля (очікується 201; статус New, власник Alice)
+POST {{api}}/api/incidents
+Content-Type: application/json
+
+{
+  "title": "Overposting probe",
+  "description": "Перевірка, що зайві поля JSON ігноруються сервером.",
+  "severity": "Low",
+  "occurredAtUtc": "2026-10-27T10:00:00Z",
+  "ownerUserId": "00000000-0000-0000-0000-000000000099",
+  "status": "Closed",
+  "id": "11111111-1111-1111-1111-111111111111"
+}
+
+### T-06 — неіснуючий ресурс (очікується 404)
+GET {{api}}/api/incidents/99999999-9999-9999-9999-999999999999
