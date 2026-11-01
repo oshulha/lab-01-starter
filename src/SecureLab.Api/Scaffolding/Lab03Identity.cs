@@ -37,20 +37,74 @@ public static class Lab03Identity
     {
         app.MapPost("/api/auth/register", async (RegistrationInput input, UserManager<ApplicationUser> users) =>
         {
-            // ЛР 03: завершіть DTO validation та перевірки довірчої межі.
-            if (string.IsNullOrWhiteSpace(input.UserName) || string.IsNullOrWhiteSpace(input.Email)
-                || string.IsNullOrWhiteSpace(input.DisplayName) || string.IsNullOrEmpty(input.Password))
-                return Results.BadRequest();
+            var errors = new Dictionary<string, string[]>();
+
+            // Нормалізуємо лише ті поля, для яких це визначає контракт. Пароль не чіпаємо.
+            var userName = input.UserName?.Trim() ?? "";
+            var email = input.Email?.Trim() ?? "";
+            var displayName = input.DisplayName?.Trim() ?? "";
+
+            if (userName.Length == 0)
+                errors["userName"] = ["Ім'я користувача обов'язкове."];
+            else if (userName.Length > 256)
+                errors["userName"] = ["Ім'я користувача не довше за 256 символів."];
+
+            if (email.Length == 0)
+                errors["email"] = ["Email обов'язковий."];
+            else if (email.Length > 256)
+                errors["email"] = ["Email не довший за 256 символів."];
+
+            if (displayName.Length == 0)
+                errors["displayName"] = ["Відображуване ім'я обов'язкове."];
+            else if (displayName.Length > 120)
+                errors["displayName"] = ["Відображуване ім'я не довше за 120 символів."];
+
+            if (string.IsNullOrEmpty(input.Password))
+                errors["password"] = ["Пароль обов'язковий."];
+            else if (input.Password.Length > 128)
+                errors["password"] = ["Пароль не довший за 128 символів."];
+
+            if (errors.Count > 0)
+                return Results.ValidationProblem(errors);
+
             var user = new ApplicationUser
             {
-                Id = Guid.NewGuid(), UserName = input.UserName.Trim(), Email = input.Email.Trim(),
-                DisplayName = input.DisplayName.Trim()
+                Id = Guid.NewGuid(),
+                UserName = userName,
+                Email = email,
+                DisplayName = displayName
             };
-            var result = await users.CreateAsync(user, input.Password);
-            if (!result.Succeeded) return Results.BadRequest(new { message = "Registration failed" });
+
+            var result = await users.CreateAsync(user, input.Password!);
+            if (!result.Succeeded)
+            {
+                var codes = result.Errors.Select(error => error.Code).ToHashSet();
+
+                // Однакова відповідь для зайнятого імені й зайнятого email.
+                if (codes.Contains("DuplicateUserName") || codes.Contains("DuplicateEmail"))
+                    return Results.Problem(
+                        statusCode: StatusCodes.Status409Conflict,
+                        title: "Конфлікт даних",
+                        detail: "Користувач із такими даними вже існує.");
+
+                var identityErrors = new Dictionary<string, string[]>();
+                if (codes.Contains("InvalidUserName"))
+                    identityErrors["userName"] = ["Дозволені латинські літери, цифри та - . _ @ +"];
+                if (codes.Contains("InvalidEmail"))
+                    identityErrors["email"] = ["Некоректний формат email."];
+                if (codes.Any(code => code.StartsWith("Password", StringComparison.Ordinal)))
+                    identityErrors["password"] =
+                        ["Щонайменше 10 символів, велика й мала літери, цифра та спеціальний символ."];
+                if (identityErrors.Count == 0)
+                    identityErrors["request"] = ["Реєстрацію не виконано."];
+                return Results.ValidationProblem(identityErrors);
+            }
+
             var role = await users.AddToRoleAsync(user, DbSeeder.ReporterRole);
-            if (!role.Succeeded) throw new InvalidOperationException("Default role assignment failed.");
-            return Results.Created("/api/me", new { user.Id, user.UserName, user.DisplayName });
+            if (!role.Succeeded)
+                throw new InvalidOperationException("Default role assignment failed.");
+
+            return Results.Created("/api/me", new RegisteredUserResponse(user.Id, userName, displayName));
         });
         app.MapPost("/api/auth/login", async (LoginInput input, SignInManager<ApplicationUser> signIn) =>
         {
@@ -73,5 +127,6 @@ public static class Lab03Identity
     }
 }
 
+public sealed record RegisteredUserResponse(Guid Id, string UserName, string DisplayName);
 public sealed record RegistrationInput(string? UserName, string? Email, string? DisplayName, string? Password);
 public sealed record LoginInput(string? UserName, string? Password);
