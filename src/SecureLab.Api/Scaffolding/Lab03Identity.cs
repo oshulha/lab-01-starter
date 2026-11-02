@@ -135,12 +135,26 @@ public static class Lab03Identity
             return Results.Created("/api/me", new RegisteredUserResponse(user.Id, userName, displayName));
         });
 
-        app.MapPost("/api/auth/login", async (LoginInput input, SignInManager<ApplicationUser> signIn) =>
+        app.MapPost("/api/auth/login", async (LoginInput input, SignInManager<ApplicationUser> signIn, HttpContext httpContext, ILogger<Program> logger) =>
         {
             if (string.IsNullOrWhiteSpace(input.UserName) || string.IsNullOrEmpty(input.Password))
+            {
+                logger.LogInformation("Auth event {EventType}: result {Result}, trace {TraceId}",
+                    "login", "failure", httpContext.TraceIdentifier);
                 return Results.Unauthorized();
+            }
+
             var result = await signIn.PasswordSignInAsync(input.UserName, input.Password, false, false);
-            return result.Succeeded ? Results.NoContent() : Results.Unauthorized();
+            if (result.Succeeded)
+            {
+                logger.LogInformation("Auth event {EventType}: result {Result}, user {UserName}, trace {TraceId}",
+                    "login", "success", input.UserName, httpContext.TraceIdentifier);
+                return Results.NoContent();
+            }
+
+            logger.LogInformation("Auth event {EventType}: result {Result}, trace {TraceId}",
+                "login", "failure", httpContext.TraceIdentifier);
+            return Results.Unauthorized();
         }).RequireRateLimiting("login");
 
         app.MapPost("/api/auth/logout", async (SignInManager<ApplicationUser> signIn) =>
