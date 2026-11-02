@@ -21,6 +21,8 @@ builder.Services.AddDbContext<SecureLabDbContext>(options =>
     options.UseNpgsql(connectionString));
 builder.Services.AddScoped<IncidentQueries>();
 
+builder.AddLab03Identity();
+
 var app = builder.Build();
 
 var resetRequested = args.Contains("--reset-database", StringComparer.Ordinal);
@@ -47,6 +49,10 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseRateLimiter();
+
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
@@ -61,6 +67,7 @@ app.MapGet("/health", async (SecureLabDbContext dbContext, CancellationToken can
     .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
 app.MapIncidentEndpoints();
+app.MapLab03Identity();
 app.MapLab02Endpoints();
 app.MapFallbackToFile("index.html");
 

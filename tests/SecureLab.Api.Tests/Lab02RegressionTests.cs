@@ -20,10 +20,18 @@ public sealed class Lab02RegressionTests(SecureLabApiFactory factory)
         occurredAtUtc = DateTimeOffset.UtcNow.AddMinutes(-10)
     };
 
+    private async Task<HttpClient> LoginBobAsync()
+    {
+        var password = Environment.GetEnvironmentVariable("SeedUsers__Password")
+            ?? throw new InvalidOperationException("Set local SeedUsers__Password outside Git.");
+        return await factory.LoginAsync("bob", password);
+    }
+
     [Fact]
     public async Task T02_CreateIncident_WithSeverity7_Returns400WithSeverityKey()
     {
-        using var response = await _client.PostAsJsonAsync(
+        using var client = await LoginBobAsync();
+        using var response = await client.PostAsJsonAsync(
             "/api/incidents", ValidBody($"Regression-{Guid.NewGuid():N}", "7"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -38,12 +46,13 @@ public sealed class Lab02RegressionTests(SecureLabApiFactory factory)
     public async Task T03_CreateIncident_WithActiveDuplicateTitle_Returns409()
     {
         var title = $"Regression-{Guid.NewGuid():N}";
+        using var client = await LoginBobAsync();
         try
         {
-            using var first = await _client.PostAsJsonAsync("/api/incidents", ValidBody(title));
+            using var first = await client.PostAsJsonAsync("/api/incidents", ValidBody(title));
             Assert.Equal(HttpStatusCode.Created, first.StatusCode);
 
-            using var second = await _client.PostAsJsonAsync("/api/incidents", ValidBody(title));
+            using var second = await client.PostAsJsonAsync("/api/incidents", ValidBody(title));
             Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
             Assert.Equal("application/problem+json", second.Content.Headers.ContentType?.MediaType);
         }

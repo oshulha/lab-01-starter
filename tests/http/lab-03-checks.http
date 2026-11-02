@@ -1,0 +1,19 @@
+@api = http://localhost:5080
+
+### /api/me без входу (до змін 501, після 401)
+GET {{api}}/api/me
+
+### Підроблений header без cookie (до змін 200 і профіль Bob, це дефект; після 401)
+GET {{api}}/api/me
+X-Demo-UserId: 10000000-0000-0000-0000-000000000002
+
+### 8. Анонімний create (до змін 201, після 401)
+POST {{api}}/api/incidents
+Content-Type: application/json
+
+{
+  "title": "Anonymous probe",
+  "description": "no login",
+  "severity": "Low",
+  "occurredAtUtc": "2026-11-02T12:00:00Z"
+}

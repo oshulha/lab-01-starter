@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SecureLab.Api.Data;
 using SecureLab.Api.Data.Entities;
+using System.Security.Claims;
 
 namespace SecureLab.Api.Scaffolding;
 
@@ -53,10 +54,13 @@ public static class Lab02Endpoints
             return Results.Ok(items);
         });
 
-        app.MapPost("/api/incidents", async (CreateIncidentRequest request, SecureLabDbContext db, CancellationToken ct) =>
+        app.MapPost("/api/incidents", async (CreateIncidentRequest request, HttpContext httpContext, SecureLabDbContext db, CancellationToken ct) =>
         {
-            // Час фіксуємо один раз.
-            var now = DateTimeOffset.UtcNow;
+            var userIdClaim = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(userIdClaim, out var ownerId))
+                return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
+            
+            var now = DateTimeOffset.UtcNow; // Час фіксуємо один раз.
             var errors = new Dictionary<string, string[]>();
 
             // 1. Базові перевірки: required і довжина (довжина вхідного значення, до Trim).
@@ -111,7 +115,7 @@ public static class Lab02Endpoints
             var incident = new Incident
             {
                 Id = Guid.NewGuid(),
-                OwnerUserId = DbSeeder.AliceId,
+                OwnerUserId = ownerId,
                 Title = title,
                 Description = description,
                 Severity = severity,
@@ -128,7 +132,7 @@ public static class Lab02Endpoints
                 incident.Id, incident.Title, incident.Severity.ToString(),
                 incident.Status.ToString(), incident.OccurredAtUtc, incident.CreatedAtUtc);
             return Results.Created($"/api/incidents/{incident.Id}", response);
-        });
+        }).RequireAuthorization();
     }
 }
 
