@@ -3,6 +3,8 @@ using SecureLab.Api.Application.Incidents;
 using SecureLab.Api.Data;
 using SecureLab.Api.Data.Entities;
 using SecureLab.Api.Presentation.Contracts;
+using System.Diagnostics; 
+using System.Security.Claims;
 
 namespace SecureLab.Api.Presentation.Endpoints;
 
@@ -146,23 +148,59 @@ public static class IncidentEndpoints
         return Results.NoContent();
     }
 
-    // УМИСНО ВРАЗЛИВО: немає role/policy check; клієнт може підставити status/owner.
     private static async Task<IResult> TriageAsync(
         Guid id,
-        TriageIncidentRequest? request,
+        HttpContext httpContext,
         SecureLabDbContext db,
+        ILogger<Program> logger,
         CancellationToken cancellationToken)
     {
-        var incident = await db.Incidents.FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
-        if (incident is null) return Results.NotFound();
+        var user = CurrentUser.From(httpContext.User);
+        if (user is null) return IncidentAccess.Unidentified();
 
-        incident.Status = Enum.TryParse<IncidentStatus>(request?.Status, true, out var s)
-            ? s : IncidentStatus.Triaged;
-        if (request?.OwnerUserId is { } owner) incident.OwnerUserId = owner;
+        // Tracked entity (без AsNoTracking): інакше SaveChanges нічого не запише.
+        var incident = await db.Incidents.FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+
+        // 1) Рішення за роллю й ресурсом, ДО будь-якої зміни стану.
+        if (!user.IsAnalyst)
+        {
+            // Administrator або власник-Reporter: роль не дозволена -> 403 + audit.
+            if (user.IsAdministrator || (incident is not null && incident.OwnerUserId == user.Id))
+            {
+                AuditDenied(logger, httpContext, user.Id, "incident.triage", id);
+                return IncidentAccess.Forbidden();
+            }
+            // Чужий або неіснуючий ресурс: однакове 404 без id у detail.
+            return IncidentAccess.NotFound();
+        }
+
+        if (incident is null) return IncidentAccess.NotFound();
+
+        // 2) Допустимість поточного status.
+        if (incident.Status != IncidentStatus.New)
+            return Results.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Конфлікт стану",
+                detail: "Перехід у Triaged можливий лише зі статусу New.");
+
+        // 3) Next status визначає СЕРВЕР; request нічого не передає.
+        incident.Status = IncidentStatus.Triaged;
         incident.UpdatedAtUtc = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(cancellationToken);
         return Results.NoContent();
+    }
+
+    private static void AuditDenied(
+        ILogger logger, HttpContext httpContext, Guid subjectId, string action, Guid resourceId)
+    {
+        // Той самий trace id, що Problem Details віддає клієнтові.
+        var traceId = Activity.Current?.Id ?? httpContext.TraceIdentifier;
+        logger.LogWarning(
+            "Audit event {EventName} subject={SubjectId} action={Action} resource=Incident/{ResourceId} " +
+            "result={Result} occurredAtUtc={OccurredAtUtc:o} traceId={TraceId}",
+            "authorization.denied", subjectId, action, resourceId, "denied",
+            DateTimeOffset.UtcNow, traceId);
     }
 
     private static async Task<IResult> DeleteAsync(
