@@ -9,7 +9,7 @@ namespace SecureLab.Api.Application.Incidents;
 
 public sealed class IncidentQueries(SecureLabDbContext dbContext, ILogger<IncidentQueries> logger)
 {
-    
+
     private static readonly IncidentSeverity[] SeverityOrder =
     [
         IncidentSeverity.Low,
@@ -52,11 +52,17 @@ public sealed class IncidentQueries(SecureLabDbContext dbContext, ILogger<Incide
     
     public async Task<IReadOnlyList<IncidentListItemResponse>> GetListAsync(
         IncidentStatus? status,
+        CurrentUser user,
         CancellationToken cancellationToken)
     {
         logger.LogInformation("Loading incidents with status filter {Status}", status);
 
-        var query = dbContext.Incidents.AsNoTracking();
+        var isAnalyst = user.IsAnalyst;
+        var userId = user.Id;
+
+        var query = dbContext.Incidents.AsNoTracking()
+            // Query scoping: Reporter бачить лише власні, Analyst усі.
+            .Where(incident => isAnalyst || incident.OwnerUserId == userId);
         if (status is not null)
         {
             query = query.Where(incident => incident.Status == status);
@@ -74,13 +80,21 @@ public sealed class IncidentQueries(SecureLabDbContext dbContext, ILogger<Incide
             .ToListAsync(cancellationToken);
     }
 
-    public Task<IncidentDetailsResponse?> GetDetailsAsync(Guid id, CancellationToken cancellationToken)
+    public Task<IncidentDetailsResponse?> GetDetailsAsync(
+        Guid id,
+        CurrentUser user,
+        CancellationToken cancellationToken)
     {
         logger.LogInformation("Loading incident {IncidentId}", id);
 
+        var isAnalyst = user.IsAnalyst;
+        var userId = user.Id;
+
         return dbContext.Incidents
             .AsNoTracking()
-            .Where(incident => incident.Id == id)
+            // Право входить в сам запит: чужий і неіснуючий дають однаковий null.
+            .Where(incident => incident.Id == id
+                && (isAnalyst || incident.OwnerUserId == userId))
             .Select(incident => new IncidentDetailsResponse(
                 incident.Id,
                 incident.Title,
@@ -91,7 +105,8 @@ public sealed class IncidentQueries(SecureLabDbContext dbContext, ILogger<Incide
                 incident.CreatedAtUtc,
                 incident.Owner.DisplayName,
                 incident.Comments
-                    .Where(comment => !comment.IsInternal)
+                    // Internal-коментарі бачить лише Analyst.
+                    .Where(comment => isAnalyst || !comment.IsInternal)
                     .OrderBy(comment => comment.CreatedAtUtc)
                     .Select(comment => new IncidentCommentResponse(
                         comment.Id,
@@ -99,6 +114,28 @@ public sealed class IncidentQueries(SecureLabDbContext dbContext, ILogger<Incide
                         comment.Text,
                         comment.CreatedAtUtc))
                     .ToList()))
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    public Task<IncidentCommentResponse?> GetCommentAsync(
+        Guid id,
+        CurrentUser user,
+        CancellationToken cancellationToken)
+    {
+        var isAnalyst = user.IsAnalyst;
+        var userId = user.Id;
+
+        return dbContext.IncidentComments
+            .AsNoTracking()
+            // Доступ до коментаря = доступ до батьківського інциденту + правило internal.
+            .Where(comment => comment.Id == id
+                && (isAnalyst
+                    || (!comment.IsInternal && comment.Incident.OwnerUserId == userId)))
+            .Select(comment => new IncidentCommentResponse(
+                comment.Id,
+                comment.Author.DisplayName,
+                comment.Text,
+                comment.CreatedAtUtc))
             .SingleOrDefaultAsync(cancellationToken);
     }
 }

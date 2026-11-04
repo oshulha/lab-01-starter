@@ -11,10 +11,29 @@ public sealed class IncidentEndpointTests(SecureLabApiFactory factory)
 {
     private readonly HttpClient _client = factory.CreateClient();
 
+    private static string Password() =>
+        Environment.GetEnvironmentVariable("SeedUsers__Password")
+        ?? throw new InvalidOperationException("Set local SeedUsers__Password outside Git.");
+
     [Fact]
-    public async Task GetList_ReturnsSeededIncidents()
+    public async Task A05_GetList_AsAlice_ReturnsOnlyOwnIncidents()
     {
-        var incidents = await _client.GetFromJsonAsync<List<IncidentListItemResponse>>(
+        using var alice = await factory.LoginAsync("alice", Password());
+
+        var incidents = await alice.GetFromJsonAsync<List<IncidentListItemResponse>>(
+            "/api/incidents");
+
+        Assert.NotNull(incidents);
+        Assert.Contains(incidents, incident => incident.Id == DbSeeder.AliceIncidentId);
+        Assert.DoesNotContain(incidents, incident => incident.Id == DbSeeder.BobIncidentId);
+    }
+
+    [Fact]
+    public async Task GetList_AsAnalyst_ReturnsSeededIncidentsOfBothOwners()
+    {
+        using var morgan = await factory.LoginAsync("morgan", Password());
+
+        var incidents = await morgan.GetFromJsonAsync<List<IncidentListItemResponse>>(
             "/api/incidents");
 
         Assert.NotNull(incidents);
@@ -25,7 +44,9 @@ public sealed class IncidentEndpointTests(SecureLabApiFactory factory)
     [Fact]
     public async Task GetDetails_ForUnknownId_ReturnsProblemDetails404()
     {
-        using var response = await _client.GetAsync($"/api/incidents/{Guid.NewGuid()}");
+        using var alice = await factory.LoginAsync("alice", Password());
+
+        using var response = await alice.GetAsync($"/api/incidents/{Guid.NewGuid()}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -34,7 +55,9 @@ public sealed class IncidentEndpointTests(SecureLabApiFactory factory)
     [Fact]
     public async Task GetDetails_DoesNotExposeInternalOwnerFields()
     {
-        using var response = await _client.GetAsync(
+        using var alice = await factory.LoginAsync("alice", Password());
+
+        using var response = await alice.GetAsync(
             $"/api/incidents/{DbSeeder.AliceIncidentId}");
         var json = await response.Content.ReadAsStringAsync();
         using var document = JsonDocument.Parse(json);
