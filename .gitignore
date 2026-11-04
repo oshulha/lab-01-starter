@@ -14,7 +14,7 @@ TestResults/
 # Local configuration and secrets
 .env
 .env.*
-!.env.example
+.env.example
 appsettings.Local.json
 *.pfx
 *.pem
