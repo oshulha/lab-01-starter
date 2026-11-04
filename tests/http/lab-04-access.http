@@ -1,0 +1,37 @@
+@host = http://localhost:5080
+@aliceId = 20000000-0000-0000-0000-000000000001
+@bobId = 20000000-0000-0000-0000-000000000002
+
+### Alice login; REST Client reads process environment
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "userName": "alice", "password": "{{$processEnv SeedUsers__Password}}" }
+
+### Own details
+GET {{host}}/api/incidents/{{aliceId}}
+Accept: application/json
+
+### Foreign details with the same Alice cookie
+GET {{host}}/api/incidents/{{bobId}}
+Accept: application/json
+
+### Bob login changes current identity
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "userName": "bob", "password": "{{$processEnv SeedUsers__Password}}" }
+
+### Own details
+GET {{host}}/api/incidents/{{bobId}}
+Accept: application/json
+
+### Morgan login; Analyst read
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "userName": "morgan", "password": "{{$processEnv SeedUsers__Password}}" }
+
+### Permitted Analyst read
+GET {{host}}/api/incidents/{{aliceId}}
+Accept: application/json
