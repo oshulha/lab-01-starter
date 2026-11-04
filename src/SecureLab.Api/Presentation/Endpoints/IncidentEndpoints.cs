@@ -34,6 +34,9 @@ public static class IncidentEndpoints
         group.MapDelete("/{id:guid}", DeleteAsync)
             .WithName("DeleteIncident");
 
+        group.MapPost("/{id:guid}/triage", TriageAsync)
+            .WithName("TriageIncident");
+
         endpoints.MapGet("/api/incident-comments/{id:guid}", GetCommentAsync)
             .WithName("GetIncidentComment")
             .WithTags("Incidents")
@@ -139,6 +142,25 @@ public static class IncidentEndpoints
         incident.Title = request.Title!.Trim();
         incident.Description = request.Description!.Trim();
         incident.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.NoContent();
+    }
+
+    // УМИСНО ВРАЗЛИВО: немає role/policy check; клієнт може підставити status/owner.
+    private static async Task<IResult> TriageAsync(
+        Guid id,
+        TriageIncidentRequest? request,
+        SecureLabDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var incident = await db.Incidents.FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+        if (incident is null) return Results.NotFound();
+
+        incident.Status = Enum.TryParse<IncidentStatus>(request?.Status, true, out var s)
+            ? s : IncidentStatus.Triaged;
+        if (request?.OwnerUserId is { } owner) incident.OwnerUserId = owner;
+        incident.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
         await db.SaveChangesAsync(cancellationToken);
         return Results.NoContent();
     }
