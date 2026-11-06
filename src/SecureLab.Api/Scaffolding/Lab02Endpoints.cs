@@ -127,7 +127,7 @@ public static class Lab02Endpoints
             var response = new CreatedIncidentResponse(
                 incident.Id, incident.Title, incident.Severity.ToString(),
                 incident.Status.ToString(), incident.OccurredAtUtc, incident.CreatedAtUtc);
-            return Results.Created($"/api/incidents/{incident.Id}", response);
+            return Results.Created($"/api/incidents/{Guid.NewGuid()}", response);
         });
     }
 }
