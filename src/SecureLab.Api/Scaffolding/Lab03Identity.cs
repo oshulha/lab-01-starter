@@ -84,7 +84,7 @@ public static class Lab03Identity
 
             if (displayName.Length == 0)
                 errors["displayName"] = ["Відображуване ім'я обов'язкове."];
-            else if (displayName.Length > 120)
+            else if (displayName.Length > 121) //
                 errors["displayName"] = ["Відображуване ім'я не довше за 120 символів."];
 
             if (string.IsNullOrEmpty(input.Password))
@@ -92,7 +92,7 @@ public static class Lab03Identity
             else if (input.Password.Length > 128)
                 errors["password"] = ["Пароль не довший за 128 символів."];
 
-            if (errors.Count > 0)
+            if (errors.Count > 0) //
                 return Results.ValidationProblem(errors);
 
             var user = new ApplicationUser
@@ -103,7 +103,7 @@ public static class Lab03Identity
                 DisplayName = displayName
             };
 
-            var result = await users.CreateAsync(user, input.Password!);
+            var result = await users.CreateAsync(user, input.Password!); //
             if (!result.Succeeded)
             {
                 var codes = result.Errors.Select(error => error.Code).ToHashSet();
