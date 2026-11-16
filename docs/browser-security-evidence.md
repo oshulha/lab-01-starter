@@ -26,18 +26,35 @@ HttpOnly: так; Secure: ні; SameSite: Lax — без Value.
 
 ## Гіпотеза й REG-XSS-01 (Для всіх)
 
-Карта Description: … Гіпотеза source → storage → response → sink/context: … Передумови, локальний користувач, Guid запису, marker із resources/lab05-marker.txt, команди reset/start і create/read: …
+Карта Description: docs/source-to-sink.md.
+Гіпотеза: значення з поля форми «Опис нового інциденту» (`<textarea name="description">` на browser-lab.html) зберігається в PostgreSQL (таблиця `incidents`, колонка `description`), повертається через JSON-поле `description` у відповіді `GET /api/incidents/{id}` і передається у sink `document.querySelector("#description").innerHTML` (browser-lab.js, рядок 10) як HTML-контекст; тому за умови, що користувач ввів у опис HTML-розмітку, браузер може інтерпретувати дані не як звичайний текст, а як код.
+
+Передумови: стенд на http://localhost:5080, БД у Docker, змінні SeedUsers__Password і ConnectionStrings__SecureLab задано в терміналі (значення не зберігаються в Git).
+Користувачі: alice (Reporter, автор запису), morgan (Analyst, глядач), bob (Reporter, контроль).
+Marker: з resources/lab05-marker.txt.
+Guid запису з marker у Description: 4ccc0040-660f-4d25-ab2e-5e2ba305930b.
+Seed-інцидент Alice із коментарем з marker (comments[].text, коментар …0005): 20000000-0000-0000-0000-000000000001.
+
+Команди reset і start:
+```
+docker compose --env-file infra/.env.example -f infra/compose.yaml up -d --wait
+dotnet run --project src/SecureLab.Api -- --reset-database
+dotnet run --project src/SecureLab.Api
+```
+
+Create/read: на /browser-lab.html під alice ввести назву й marker в «Опис нового інциденту», натиснути «Створити й прочитати» (POST /api/incidents → GET /api/incidents/{id}); для коментаря — вказати Guid seed-інциденту й натиснути «Прочитати». Перед кожною перевіркою оновлювати сторінку й переконатися, що команда перевірки повертає null.
 
 | Спостереження | До fix | Після fix | Посилання на доказ |
 |---|---|---|---|
-| Значення в БД/API | | | |
-| DOM основного Description | | | |
-| Дія marker | | | |
-| Апостроф/лапки, 5 < 7, Unicode, HTML-like рядок | | | |
-| Довжина за власними правилами ЛР 2 | | | |
-| Вікно Morgan: GET і перевірка marker; контроль Bob | | | |
+| Значення в БД/API | `description` у JSON = marker | | docs/evidence/before-description.json |
+| DOM основного Description | `<img src="x" onerror=…>` усередині `#description` | | скріншот Elements |
+| Дія marker | команда `document.querySelector("#lab05-marker-target").getAttribute("data-lab05-marker")` → `'executed'` | | скріншот Console |
+| Апостроф/лапки, 5 < 7, Unicode, HTML-like рядок | той самий текст; `<b>жирний</b>` стає елементом `<b>` | | скріншот Elements |
+| Довжина за власними правилами ЛР 2 | 3900 символів відображено повністю | | |
+| Вікно Morgan: GET і перевірка marker; контроль Bob | Morgan: GET 200, перевірка → `'executed'`; Bob: 403/404, `null` | | скріншот |
 
-Finding: актив; передумови; першопричина; safe DOM diff; retest; залишковий ризик: … Повторювана REG-XSS-01, негативний контроль і очікування: …
+Finding: актив — сеанс браузера та дані/дії, доступні від імені користувача (Alice, Morgan); передумови — локальний акаунт, контроль над текстовим полем Description (або публічний коментар), інший користувач відкриває запис; першопричина — недовірений текст Incident.Description та IncidentComment.Text з БД через JSON потрапляє в `innerHTML` (browser-lab.js, рядки 10 і 14); вплив на стенді — marker виконав лише безпечну локальну дію (атрибут на `#lab05-marker-target`), у тому числі в сеансі Morgan; safe DOM diff, retest, залишковий ризик — заповнити після виправлення.
+Повторювана REG-XSS-01, негативний контроль і очікування: заповнити після Етапу 4.
 
 ## CORS і REG-CORS-01 (Для всіх)
 
@@ -90,3 +107,5 @@ Preflight з 4173 і 4174, OPTIONS → GET / blocked GET, exact origin/header/me
 DOM-тест: файл/команда, browser, vulnerable commit і FAIL, fixed commit і PASS: … Comments, повторний render без дублювання та позитивні рядки: … CSP report-only → enforcement: фактичні headers, flow і кероване порушення в обох режимах: … safe-url.js / атрибут: … Пояснення text/attribute/URL/JavaScript та ризик third-party scripts — посилання на DEL-03: …
 
 Додаткових DEL, навчальних демо або нового журналу не подавайте. Перед поданням повторіть чекліст для свого накопичувального рівня.
+
+safe-url.js виконано в Console на browser-lab: https і відносний шлях дозволено, javascript: (також у іншому регістрі та з пробілом) і зламаний URL відхилено (null); посилання отримало лише href, onclick немає. Поточний клієнт не створює посилань із даних, тому політика: посилання з користувацьких даних не створюються; якщо знадобляться, лише через new URL() і дозволені протоколи http/https (за потреби allowlist host).

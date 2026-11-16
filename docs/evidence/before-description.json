@@ -1,0 +1,11 @@
+{
+    "id": "4ccc0040-660f-4d25-ab2e-5e2ba305930b",
+    "title": "Marker test",
+    "description": "<img src=x onerror=\"document.querySelector('#lab05-marker-target').setAttribute('data-lab05-marker','executed')\">",
+    "severity": "Low",
+    "status": "New",
+    "occurredAtUtc": "2026-11-16T13:17:42.175+00:00",
+    "createdAtUtc": "2026-11-16T13:17:42.212738+00:00",
+    "ownerDisplayName": "Аліса Коваль",
+    "comments": []
+}
