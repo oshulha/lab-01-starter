@@ -62,22 +62,27 @@ Finding: актив — сеанс браузера та дані/дії, дос
 
 | Сценарій | Чи доходить request до API? | Чи може JavaScript прочитати response? | Чому |
 |---|---|---|---|
-| same-origin 5080 → API | | | |
-| simple GET 4173 → API | | | |
-| simple GET 4174 → API | | | |
-| curl/.http → API | | не застосовується | |
-| preflighted 4173 → API («Добре / Відмінно») | | | |
+| same-origin 5080 → API | так | так | Той самий origin, SOP не втручається, CORS не потрібен |
+| simple GET 4173 → API | так | ні (без CORS-дозволу) | Запит простий, браузер надсилає одразу, але сервер ще не дозволив цей origin, тож response не читається |
+| simple GET 4174 → API | так | ні | Те саме, що 4173, origin не дозволено |
+| curl/.http → API | так | не застосовується | Це не браузер, SOP/CORS немає, клітинка JS «не застосовується» |
+| preflighted 4173 → API | спершу OPTIONS, actual GET залежить від нього | ні без успішного preflight | Власний заголовок X-Lab-Cors-Probe змушує браузер спершу надіслати OPTIONS, без дозволу GET не надсилається |
 
 Команди запуску probes: … Policy — лише Development, один exact origin 4173; 4174 — контроль. Для «Задовільно» без AllowCredentials().
 
-| Клієнт / простий запит | До policy | Fixed state | Status, ACAO, Console / доказ |
-|---|---|---|---|
-| Same-origin 5080 | | | |
-| Allowed 4173 | | | |
-| Disallowed 4174 | | | |
-| Direct HTTP / curl | | | |
+Колонки: **До policy / Fixed state / Status, ACAO, Console**. «До policy» це стан до кроку 4, «Fixed state» це кінцевий стан із `AllowCredentials()`.
 
-REG-CORS-01: browser evidence і дві actual HTTP-відповіді для Origin 4173/4174: … Перевірка порядку через читання 401 без cross-origin cookie: … Пояснення різниці browser/direct HTTP: …
+| Клієнт | До policy | Fixed state | Status, ACAO, Console / доказ |
+|---|---|---|---|
+| Same-origin 5080 | 200, JS читає (browser-lab працює) | без змін | 200, ACAO немає і не потрібен; сторінка `browser-lab` рендерить дані |
+| Allowed 4173 | request доходить, response заблоковано | 200, JS читає | до: Console «No Access-Control-Allow-Origin»; після: 200, ACAO `http://localhost:4173`, ACAC `true` |
+| Disallowed 4174 | request доходить, response заблоковано | так само заблоковано | 200 у Network, ACAO немає, Console «No Access-Control-Allow-Origin» |
+| Direct HTTP / curl | не знімалось | 200 завжди; ACAO лише для Origin 4173 | curl: без Origin і з Origin 4174 немає ACAO; з Origin 4173 ACAO `http://localhost:4173` + ACAC `true` |
+
+REG-CORS-01:
+- **Browser evidence і дві actual HTTP-відповіді:** з origin 4173 запит `/health` і `/api/incidents` повертають 200 з ACAO 4173, JS читає. З 4174 у Console блокування CORS. Дві відповіді curl: `Origin: 4173` дає ACAO 4173 (+ACAC true), `Origin: 4174` дає 200 і тіло, але ACAO немає.
+- **Перевірка порядку (401 без cross-origin cookie):** запит із 4173 без cookie повернув читабельний `401`. Це означає, що `UseCors` стоїть перед `UseAuthentication`: навіть відмова 401 несе CORS-заголовки, і браузер дає JS її прочитати.
+- **Різниця browser/direct HTTP:** сервер сам не відхиляє 4174, а лише не додає заголовки дозволу. Заборону застосовує тільки браузер. curl і інші клієнти бачать повну відповідь, тому CORS не є захистом API, авторизацією чи захистом від CSRF.
 
 ## Додатково для Добре та Відмінно
 
