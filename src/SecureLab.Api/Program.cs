@@ -48,10 +48,22 @@ if (resetRequested)
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
+var csp = "default-src 'self'; frame-ancestors 'none'";
+
 app.Use(async (context, next) =>
 {
     context.Response.Headers.XContentTypeOptions = "nosniff";
-    context.Response.Headers.Append("Referrer-Policy", "no-referrer");
+    context.Response.Headers["Referrer-Policy"] = "no-referrer";
+
+    var isDevelopmentApiReference =
+        app.Environment.IsDevelopment()
+        && context.Request.Path.StartsWithSegments("/scalar");
+
+    if (!isDevelopmentApiReference)
+    {
+        context.Response.Headers["Content-Security-Policy"] = csp;
+    }
+
     await next(context);
 });
 

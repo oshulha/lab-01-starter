@@ -1,10 +1,10 @@
 # Докази безпеки браузера (DEL-01)
 
-Рівень: достатній («Задовільно») / добрий («Добре») / відмінний («Відмінно») — оберіть. Рівні накопичувальні; повні критерії й маршрут — на початку практичної частини методички. Заповнюйте лише розділи свого рівня й усі попередні. Не записуйте паролі, cookie/token values чи export browser storage.
+Рівень: Рівень: відмінний («Відмінно»). Рівні накопичувальні; повні критерії й маршрут — на початку практичної частини методички. Заповнюйте лише розділи свого рівня й усі попередні. Не записуйте паролі, cookie/token values чи export browser storage.
 
 ## Стенд і Git-стан (Для всіх)
 
-ОС, browser/version, API/probe ОС: Windows 10; Chrome 155.
+ОС, browser/version, API/probe origins: Windows 10; Chrome 155.
 API/client: http://localhost:5080; probes: 4173 (дозволений) і 4174 (контрольний).
 release, base_commit, entry_parent: 
 ```json
@@ -15,14 +15,12 @@ release, base_commit, entry_parent:
   "entry_parent": "9e8db3a2006a0ca2d5b4fb23e75b92b10b397bf0"
 }
 ```
-Vulnerable commit: 0545af589fc9c90717aaee8b127cfd2b0097c81d.
-Fixed hash, v0.5.0
+XSS-fix commit: 4f643c972dace1cb13e6319f069dea25a4ec242e.
+Fixed hash (кінцевий, на нього вказує v0.5.0), main і спосіб передавання: [заповнити в кроці 5].
 
 Механізм сеансу (Application → Storage → Cookies → http://localhost:5080):
 .AspNetCore.Identity.Application; Domain: localhost; Path: /; Expires: Session;
 HttpOnly: так; Secure: ні; SameSite: Lax — без Value.
-
-Значення з поля форми «Опис нового інциденту» (`<textarea name="description">` на browser-lab.html) зберігається в PostgreSQL (таблиця `incidents`, колонка `description`), повертається через JSON-поле `description` у відповіді `GET /api/incidents/{id}` і передається у sink `document.querySelector("#description").innerHTML` (browser-lab.js, рядок 10) як HTML-контекст; тому за умови, що користувач ввів у опис рядок із HTML-розміткою (наприклад, тег з обробником події), браузер може інтерпретувати дані не як звичайний текст, а як код.
 
 ## Гіпотеза й REG-XSS-01 (Для всіх)
 
@@ -54,7 +52,14 @@ Create/read: на /browser-lab.html під alice ввести назву й mark
 | Вікно Morgan: GET і перевірка marker; контроль Bob | Morgan: GET 200, перевірка → `'executed'`; Bob: 403/404, `null` | | скріншот |
 
 Finding: актив — сеанс браузера та дані/дії, доступні від імені користувача (Alice, Morgan); передумови — локальний акаунт, контроль над текстовим полем Description (або публічний коментар), інший користувач відкриває запис; першопричина — недовірений текст Incident.Description та IncidentComment.Text з БД через JSON потрапляє в `innerHTML` (browser-lab.js, рядки 10 і 14); вплив на стенді — marker виконав лише безпечну локальну дію (атрибут на `#lab05-marker-target`), у тому числі в сеансі Morgan; safe DOM diff, retest, залишковий ризик — заповнити після виправлення.
-Повторювана REG-XSS-01, негативний контроль і очікування: заповнити після Етапу 4.
+Повторювана REG-XSS-01, негативний контроль і очікування: | Поле | Вміст |
+|---|---|
+| Передумови | fixed commit `4f643c9` (або новіший), API запущено, вхід як Alice, Guid запису `4ccc0040-660f-4d25-ab2e-5e2ba305930b` (або ваш), reset: `--reset-database` |
+| Вхід | marker із `resources/lab05-marker.txt` |
+| Кроки | `/browser-lab.html` → ввести Guid → «Прочитати» → в Elements подивитися `#description` і `#comments` |
+| Очікуваний результат | marker не виконується, в DOM текстовий вузол, звичайний текст відображається |
+| Негативний контроль | на vulnerable `0545af5` marker виконував дію (Етап 1, до CSP) |
+| Доказ | Network/Elements, файли `browser-lab.js`, `DbSeeder.cs` |
 
 ## CORS і REG-CORS-01 (Для всіх)
 
@@ -68,9 +73,10 @@ Finding: актив — сеанс браузера та дані/дії, дос
 | curl/.http → API | так | не застосовується | Це не браузер, SOP/CORS немає, клітинка JS «не застосовується» |
 | preflighted 4173 → API | спершу OPTIONS, actual GET залежить від нього | ні без успішного preflight | Власний заголовок X-Lab-Cors-Probe змушує браузер спершу надіслати OPTIONS, без дозволу GET не надсилається |
 
-Команди запуску probes: … Policy — лише Development, один exact origin 4173; 4174 — контроль. Для «Задовільно» без AllowCredentials().
-
-Колонки: **До policy / Fixed state / Status, ACAO, Console**. «До policy» це стан до кроку 4, «Fixed state» це кінцевий стан із `AllowCredentials()`.
+Команди запуску probes:
+py -3 -m http.server 4173 --bind localhost --directory demonstrations/cors-probe
+py -3 -m http.server 4174 --bind localhost --directory demonstrations/cors-probe
+Policy — лише Development, один exact origin 4173, з AllowCredentials() (рівень «Відмінно»); 4174 — контроль.
 
 | Клієнт | До policy | Fixed state | Status, ACAO, Console / доказ |
 |---|---|---|---|
@@ -90,22 +96,22 @@ REG-CORS-01:
 
 Preflight з 4173 і 4174, OPTIONS → GET / blocked GET, exact origin/header/method: … Cookie-дослід 4173/4174/без AllowCredentials()/401 без входу: … Кінцевий AllowCredentials() — лише Development policy для 4173. Review XSS/CORS/CSRF/authorization — посилання на DEL-03: …
 
-| Директива CSP | Фактичні ресурси застосунку | Обране джерело / причина |
+| Директива | Фактичні ресурси | Обране джерело / причина |
 |---|---|---|
-| default-src | | |
-| script-src | | |
-| style-src | | |
-| connect-src | | |
-| img-src | | |
-| frame-ancestors | | |
+| default-src | усе з 5080 | `'self'` |
+| script-src | власні JS-файли | `'self'` (успадковується від default-src, окремо можна не писати) |
+| style-src | власний CSS | `'self'` |
+| connect-src | запити до API на 5080 | `'self'` (4173 не додаємо, це лише експериментальний стенд) |
+| img-src | власні зображення | `'self'` |
+| frame-ancestors | вбудовування не потрібне | `'none'` |
 
 Місце зміни middleware: … Enforcement: document 200 і фактичний CSP header; три сторінки flow; кероване порушення new Image() до 4173 — результат: … Для «Добре» докази report-only не обов’язкові.
 
 | Header / control | Фактичне значення | Ризик і межа захисту / policy rationale |
 |---|---|---|
-| X-Content-Type-Options | | |
-| Referrer-Policy | | |
-| frame-ancestors | | |
+| X-Content-Type-Options | `nosniff` | Зменшує ризик, що браузер вгадає тип файлу за вмістом і виконає, наприклад, текст як скрипт. Не замінює правильний `Content-Type` на сервері та валідацію даних |
+| Referrer-Policy | `no-referrer` | Не передає адресу сторінки в заголовку `Referer` на інші сайти, тобто зменшує витік URL. Не замінює заборону класти секрети в URL |
+| frame-ancestors (у CSP) | `'none'` | Забороняє вбудовувати застосунок в `<iframe>` чужих сайтів, тобто захищає від clickjacking. Не замінює авторизацію й не виправляє XSS |
 
 ## Додатково для Відмінно
 
