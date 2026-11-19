@@ -1,6 +1,6 @@
 # Security review SecureLab, ЛР 6
 
-Рівень: добрий («Добре»); рівні накопичувальні. Commit початку огляду (review-start): ЗАПОВНИТИ після коміту «Update SDK policy» (див. розділ 4). Хеші прийнятого merge commit і тегу v1.0.0 додає скрипт експорту в PDF. Дата: 2026-11-18. Версія SDK: ЗАПОВНИТИ (вивід `dotnet --version`). Профіль запуску: Development (локально, лише навчальні дані й акаунти). Клієнт: браузер (DevTools) та .http-файли.
+Рівень: добрий («Добре»); рівні накопичувальні. Commit початку огляду (review-start): `d27f11a6b133c6b690ed849dad86f700190da5bf` (HEAD із застосованою SDK-політикою). Хеші прийнятого merge commit і тегу v1.0.0 додає скрипт експорту в PDF. Дата: 2026-11-18. Версія SDK: 10.0.401 (політика global.json: 10.0.100, rollForward latestFeature). Профіль запуску: Development (локально, лише навчальні дані й акаунти). Клієнт: браузер (DevTools) та .http-файли.
 
 ## 1. Executive summary
 Один абзац: що перевірено, скільки знахідок зафіксовано й виправлено, результат фактичного фінального прогону, головні залишкові ризики.
@@ -10,10 +10,10 @@
 Для всіх: див. threat-model.md. Добрий/відмінний: кожна межа → конкретний test; відмінний: asset → threat → control → verification.
 ## 4. Methodology та test environment
 Відомий початковий стан, яка саме локальна БД, хеші початку й кінця, профіль запуску, конкретний клієнт і сеанс, команди та їхні коди завершення.
-- Review-start commit: ЗАПОВНИТИ (результат `git rev-parse HEAD` після коміту «Update SDK policy»)
+- Review-start commit: `d27f11a6b133c6b690ed849dad86f700190da5bf` (коміт «Update SDK policy»)
 - Базовий тег: v0.5.0 (`3b2c853`, не переміщується); гілка: lab/6-hardening-review
 - Дата початку: 2026-11-18
-- SDK: ЗАПОВНИТИ (`dotnet --version`, очікується 10.0.*)
+- SDK: 10.0.401 (global.json: version 10.0.100, rollForward latestFeature, allowPrerelease false)
 - Локальна БД: PostgreSQL у Docker Compose, 127.0.0.1:54329, база securelab (навчальні дані)
 - Профіль запуску: Development (reset/seed); production-like — окремо, `--no-launch-profile`
 - Клієнт і сеанс: браузер (DevTools) та .http-файли; акаунти alice, bob, morgan, admin
