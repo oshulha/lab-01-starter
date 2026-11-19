@@ -2,7 +2,7 @@
 
 | Елемент | Ваш запис |
 |---|---|
-| Версія та середовище | review-start `d27f11a6b133c6b690ed849dad86f700190da5bf`; профіль Development (локально, `http://localhost:5080`), окремо production-like без launch profile (етап 1); PostgreSQL у Docker Compose на `127.0.0.1:54329`; reset/seed командою `--reset-database`; SDK 10.0.401 (global.json: 10.0.100, latestFeature); лише навчальні дані й акаунти |
+| Версія та середовище | review-start `d27f11a6b133c6b690ed849dad86f700190da5bf`; профіль Development (локально, `http://localhost:5080`), окремо production-like без launch profile (етап 1); PostgreSQL у Docker Compose на `127.0.0.1:54330`; reset/seed командою `--reset-database`; SDK 10.0.401 (global.json: 10.0.100, latestFeature); лише навчальні дані й акаунти |
 | Компоненти в межах огляду | браузерний клієнт (`src/SecureLab.Api/Client`: `index`, `auth-lab`, `browser-lab`, `register-check` — `.html` і `.js`); ASP.NET Core API; PostgreSQL у Docker Compose; конфігурація (`appsettings*.json`, змінні середовища, `infra/compose.yaml`); консольні журнали. Redis не використовується |
 | Активи | облікові дані користувачів (хеші паролів Identity) і cookie автентифікації; `Incident` та пов'язані `IncidentComment`, `IncidentStatusHistory` (власні записи, internal-коментарі); привілейований перехід `Incident.Status` (triage); audit-подія `authorization.denied`; секрети конфігурації (`SeedUsers__Password`, `ConnectionStrings__SecureLab`) |
 | Суб'єкти | анонімний відвідувач; Reporter (Alice, Bob); Analyst (Morgan); Administrator (Admin); локальний розробник. Права — у `docs/access-matrix.md` |
@@ -20,7 +20,7 @@
 [ ASP.NET Core API ] ── validation, authn/authz, rate limit (login), error handling, logging
         │   connection string (з environment) / EF Core
         ▼
-[ PostgreSQL (Docker Compose, 127.0.0.1:54329) ]
+[ PostgreSQL (Docker Compose, 127.0.0.1:54330) ]
 
 [ Repository + NuGet ] ──► restore/build
 [ Environment variables + appsettings ] ──► старт API

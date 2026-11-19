@@ -14,7 +14,7 @@
 - Базовий тег: v0.5.0 (`3b2c853`, не переміщується); гілка: lab/6-hardening-review
 - Дата початку: 2026-11-18
 - SDK: 10.0.401 (global.json: version 10.0.100, rollForward latestFeature, allowPrerelease false)
-- Локальна БД: PostgreSQL у Docker Compose, 127.0.0.1:54329, база securelab (навчальні дані)
+- Локальна БД: PostgreSQL у Docker Compose, 127.0.0.1:54330, база securelab (навчальні дані)
 - Профіль запуску: Development (reset/seed); production-like — окремо, `--no-launch-profile`
 - Клієнт і сеанс: браузер (DevTools) та .http-файли; акаунти alice, bob, morgan, admin
 
