@@ -52,7 +52,7 @@ public static class Lab02Endpoints
                     item.Severity.ToString(), item.Status.ToString(), item.CreatedAtUtc))
                 .ToListAsync(ct);
             return Results.Ok(items);
-        });
+        }).RequireRateLimiting("search");
 
         app.MapPost("/api/incidents", async (CreateIncidentRequest request, HttpContext httpContext, SecureLabDbContext db, CancellationToken ct) =>
         {

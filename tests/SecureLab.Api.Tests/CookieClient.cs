@@ -7,7 +7,7 @@ namespace SecureLab.Api.Tests;
 public static class CookieClient
 {
     public static async Task<HttpClient> LoginAsync(
-        this SecureLabApiFactory factory, string userName, string password, bool withCsrf = true)
+        this WebApplicationFactory<Program> factory, string userName, string password, bool withCsrf = true)
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {

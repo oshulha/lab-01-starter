@@ -13,6 +13,8 @@ public static class Lab03Identity
 {
     public const int LoginPermitLimit = 10;
     public static readonly TimeSpan LoginWindow = TimeSpan.FromSeconds(10);
+    public const int SearchPermitLimit = 20;
+    public static readonly TimeSpan SearchWindow = TimeSpan.FromSeconds(10);
 
     public static void AddLab03Identity(this WebApplicationBuilder builder)
     {
@@ -61,12 +63,31 @@ public static class Lab03Identity
                         Window = LoginWindow,
                         QueueLimit = 0
                     }));
+            // F-03: окремий ліміт для публічного пошуку. Партиція: автентифікований користувач
+            // (його ідентифікатор) або, для анонімів, IP-адреса; квоти партицій незалежні.
+            options.AddPolicy("search", httpContext =>
+            {
+                var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var partitionKey = userId is not null
+                    ? "user:" + userId
+                    : "ip:" + (httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = SearchPermitLimit,
+                        Window = SearchWindow,
+                        QueueLimit = 0
+                    });
+            });
             options.OnRejected = (context, _) =>
             {
+                var eventType = context.HttpContext.Request.Path.StartsWithSegments("/api/incidents/search")
+                    ? "search" : "login";
                 var logger = context.HttpContext.RequestServices
                     .GetRequiredService<ILoggerFactory>().CreateLogger("Auth");
                 logger.LogWarning("Auth event {EventType}: result {Result}, trace {TraceId}",
-                    "login", "rate_limited", context.HttpContext.TraceIdentifier);
+                    eventType, "rate_limited", context.HttpContext.TraceIdentifier);
                 return ValueTask.CompletedTask;
             };
         });
