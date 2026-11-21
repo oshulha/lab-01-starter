@@ -87,7 +87,7 @@ public static class Lab03Identity
                 var logger = context.HttpContext.RequestServices
                     .GetRequiredService<ILoggerFactory>().CreateLogger("Auth");
                 logger.LogWarning("Auth event {EventType}: result {Result}, trace {TraceId}",
-                    eventType, "rate_limited", context.HttpContext.TraceIdentifier);
+                    eventType, "rate_limited", System.Diagnostics.Activity.Current?.Id ?? context.HttpContext.TraceIdentifier);
                 return ValueTask.CompletedTask;
             };
         });
@@ -172,7 +172,7 @@ public static class Lab03Identity
             if (string.IsNullOrWhiteSpace(input.UserName) || string.IsNullOrEmpty(input.Password))
             {
                 logger.LogInformation("Auth event {EventType}: result {Result}, trace {TraceId}",
-                    "login", "failure", httpContext.TraceIdentifier);
+                    "login", "failure", System.Diagnostics.Activity.Current?.Id ?? httpContext.TraceIdentifier);
                 return Results.Unauthorized();
             }
 
@@ -180,12 +180,12 @@ public static class Lab03Identity
             if (result.Succeeded)
             {
                 logger.LogInformation("Auth event {EventType}: result {Result}, user {UserName}, trace {TraceId}",
-                    "login", "success", input.UserName, httpContext.TraceIdentifier);
+                    "login", "success", input.UserName, System.Diagnostics.Activity.Current?.Id ?? httpContext.TraceIdentifier);
                 return Results.NoContent();
             }
 
             logger.LogInformation("Auth event {EventType}: result {Result}, trace {TraceId}",
-                "login", "failure", httpContext.TraceIdentifier);
+                "login", "failure", System.Diagnostics.Activity.Current?.Id ?? httpContext.TraceIdentifier);
             return Results.Unauthorized();
         }).RequireRateLimiting("login");
 

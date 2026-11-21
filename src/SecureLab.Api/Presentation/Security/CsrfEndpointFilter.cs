@@ -21,7 +21,8 @@ public sealed class CsrfEndpointFilter(IAntiforgery antiforgery, ILogger<CsrfEnd
         {
             logger.LogWarning(
                 "Security event {EventType}: result {Result}, method {Method}, trace {TraceId}",
-                "csrf.rejected", "denied", httpContext.Request.Method, httpContext.TraceIdentifier);
+                "csrf.rejected", "denied", httpContext.Request.Method,
+                System.Diagnostics.Activity.Current?.Id ?? httpContext.TraceIdentifier);
             return Results.Problem(
                 title: "Відсутній або невалідний CSRF-токен",
                 statusCode: StatusCodes.Status400BadRequest);
