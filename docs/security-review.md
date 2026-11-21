@@ -4,10 +4,21 @@
 
 ## 1. Executive summary
 Один абзац: що перевірено, скільки знахідок зафіксовано й виправлено, результат фактичного фінального прогону, головні залишкові ризики.
+
+Перевірено застосунок SecureLab (ASP.NET Core minimal API, Identity з cookie-автентифікацією, PostgreSQL у Docker, браузерний клієнт) на рівні «Добре». Зафіксовано й виправлено дві знахідки: F-01 (заголовки безпеки зникали на відповідях 500) і F-02 (змінюючі маршрути з cookie-автентифікацією без antiforgery, CSRF). Додатково реалізовано ліміт запитів для публічного пошуку з незалежними партиціями (control, не знахідка). Фактичний прогін: 47 тестів, 47 пройдено, 0 провалів, серед них REG-CSRF-01, REG-CORS-01 та обидва ліміти. Вразливих NuGet-пакетів не виявлено. Головні залишкові ризики: пошук лишається публічним, перевірка CSRF залежить від відсутності XSS і вимагає HTTPS у Production, ліміти живуть у пам'яті одного процесу.
+
 ## 2. Scope та exclusions
 Поточні відстежувані Git файли — обов’язково. Історія Git: лише фактично переглянуті файли, refs або проміжок дат; інакше напишіть «не перевірено».
+
+- **У межах:** усі поточні відстежувані Git файли гілки `lab/6-hardening-review` (код API, клієнт, тести, інфраструктура, документація); локальний стенд (Development і production-like запуск із `--no-launch-profile`); навчальні дані й акаунти alice, bob, morgan, admin.
+- **Поза межами:** історія Git (**не перевірялась**, лише поточні файли); зовнішнє розгортання, TLS-проксі, мережеві атаки; DoS поза рівнем застосунку; каталог `one-time-examples`.
+- **Обмеження:** одноразові ручні перевірки Production виконано по HTTP на localhost; автоматичні тести працюють у Development.
+
 ## 3. System overview і trust boundaries
 Для всіх: див. threat-model.md. Добрий/відмінний: кожна межа → конкретний test; відмінний: asset → threat → control → verification.
+
+Опис компонентів, довірених меж і карти «межа → очікувана властивість → test» див. [threat-model.md](threat-model.md). Для кожної межі зазначено конкретний тест (доступ: `AccessControlTests`; cookie: `CookieFlagsTests`; ліміти: `LoginRateLimitTests`, `SearchRateLimitTests`; CSRF: `CsrfRegressionTests`; CORS: `CorsRegressionTests`).
+
 ## 4. Methodology та test environment
 Відомий початковий стан, яка саме локальна БД, хеші початку й кінця, профіль запуску, конкретний клієнт і сеанс, команди та їхні коди завершення.
 - Review-start commit: `d27f11a6b133c6b690ed849dad86f700190da5bf` (коміт «Update SDK policy»)
@@ -36,6 +47,26 @@
 
 ## 7. Regression results
 Для всіх: мінімальний pack SQLi/authentication/authorization-IDOR/XSS/CSRF. Добрий/відмінний: ще validation/CORS/rate limiting. Відмінний: автоматизований повний REG-CSRF-01 (login/cookie → відмова → незмінний стан → token → успіх → змінений стан), команда й фактичний результат. Початкові ID сценаріїв (T/S/A/E/R/REG), команда або тест, передумова, точний результат, перевірка стану ресурсу, перевірений фінальний commit.
+
+Команда повного прогону (профіль Development, змінну `SeedUsers__Password` передано ззовні):
+
+```
+dotnet test SecureLab.sln -c Release --no-build --logger "console;verbosity=normal"
+```
+
+Фактичний результат (2026-11-21): `Test Run Successful. Total tests: 47, Passed: 47, Failed: 0`, час 37,7 с. Повний вивід: `docs/evidence/l6-tests-final.txt`. Перевірений commit: додати після фінального коміту.
+
+| Клас перевірки | ID / тест | Передумова | Результат | Стан ресурсу |
+|---|---|---|---|---|
+| SQL injection | `Lab02RegressionTests.T04_Search_WithApostrophe_Returns200AndSeededIncident`, `S02_Search_*` | публічний пошук | Passed (апостроф і керівні символи не ламають запит, пошук параметризований) | дані не змінено |
+| Authentication | `AuthScenarioTests` (в т.ч. A07: невідомий користувач і хибний пароль виглядають однаково), `CookieFlagsTests.Login_OverHttps_SetsHttpOnlySecureLaxCookie` | HTTPS | Passed | сеанс створюється лише з валідними обліковими даними |
+| Authorization / IDOR | `AccessControlTests` (A01–A12, у т.ч. A09: відмова записується в аудит) | акаунти alice, bob, morgan | Passed | чужі інциденти недоступні, стан не змінюється |
+| XSS | `IncidentEndpointTests.ClientScript_DoesNotUseDangerousInnerHtmlSink` | вихідний код клієнта | Passed | |
+| CSRF | **REG-CSRF-01**: `CsrfRegressionTests.REG_CSRF_01_*` (3 тести) | вхід (cookie) → запит без / з хибним токеном → 400 → валідний токен → успіх | Passed | без токена інцидент не створено, з токеном створено; logout без токена не завершує сеанс |
+| Validation | `Lab02RegressionTests.T05_Search_WithUnknownSortBy_Returns400WithSortByKey`, `RegisterContractTests` (T01/T02) | | Passed | |
+| CORS | **REG-CORS-01**: `CorsRegressionTests.REG_CORS_01_*` (3 тести) | Development | Passed | чужий Origin без `Access-Control-Allow-Origin`; дозволений повертається точно |
+| Rate limiting | `LoginRateLimitTests.Login_ExceedingLimit_Returns429_ThenRecoversAfterWindow`, `SearchRateLimitTests.*` (2 тести) | окремий host | Passed | 429 після квоти, відновлення після вікна, партиції незалежні |
+
 ## 8. Hardening controls
 Для всіх: наявні controls; наявний login limiter — повторна перевірка (quota, 429, відновлення), відсутній — gap або виключення з причиною. Добрий/відмінний: наявні headers, CORS, search limiter (два partitions, quota, 429, відновлення). CSP, якої не було, — N/A на достатньому/доброму; для відмінного вона обов’язкова й не має ламати client. Добрий/відмінний: змістові відмінності Development/Production. Відмінний: погодження advanced variant до реалізації й фактична перевірка; Redis — shared state, TTL, partition isolation, failure mode.
 
@@ -111,16 +142,63 @@ dotnet list SecureLab.sln package --outdated                          # l6-deps-
 
 Умова перегляду: нова вразливість у `--vulnerable`, оновлення SDK, перехід на .NET 11. Відновлення відтворюване завдяки `packages.lock.json` (`dotnet restore --locked-mode`).
 
+### 9.2 Секрети (поточні відстежувані файли)
+
+Межі: перевірено лише поточні файли під Git (`git ls-files`, `git grep`); історію Git **не перевіряв**. Команди:
+
+```
+git ls-files | findstr /i ".env secret appsettings .pfx .key"
+git check-ignore -v .env infra/.env
+git --no-pager grep -n -i -E "password|secret|apikey|api_key|connectionstring|bearer|private key|Pwd=" -- . ":!docs" ":!one-time-examples"
+```
+
+Результат: файлів `.env`, `.pfx`, `.key`, `secrets*` під Git немає; `.env` ігнорується (`.gitignore:15`). `infra/.env.example` містить лише `POSTGRES_PORT=54330`; `appsettings.json` не містить секретів (журнал, `AllowedHosts`, прапорці БД).
+
+| Знахідка пошуку | Клас | Рішення |
+|---|---|---|
+| `infra/compose.yaml:9` `POSTGRES_PASSWORD: local-study-password` | відкрите локальне навчальне значення (не секрет); порт БД прив'язаний до 127.0.0.1 | прийняти, задокументовано в README |
+| `appsettings.Development.json:3` рядок підключення з `local-study-password` | те саме навчальне значення, файл діє лише в Development | прийняти; у Production рядок передається змінною `ConnectionStrings__SecureLab` (перевірено) |
+| `SecureLabDesignTimeDbContextFactory.cs:9-15` резервний рядок підключення | те саме значення; резерв лише для EF design-time, перекривається змінною середовища | прийняти |
+| `README.md:63,66,135,138` | документація: описує відкрите навчальне значення й забороняє комітити реальні | не секрет |
+| `DbSeeder.cs`, `SeedUsers:Password` | пароль seed передається ззовні (`SeedUsers__Password`), у коді лише ім'я ключа | ок |
+| `tests/*` (`SeedUsers__Password`, значення `wrong`, `short1!`) | пароль із середовища; решта це негативні тестові значення | не секрет |
+| `tests/http/lab-04-access.http` `{{$processEnv SeedUsers__Password}}` | посилання на змінну середовища | ок |
+| `Client/auth-lab.html`, `auth-lab.js` (поля `password`) | елементи форми, не значення | хибне спрацювання |
+| міграції, snapshot (`PasswordHash`), `packages.lock.json` (`UserSecrets`) | назви колонок і пакета | хибне спрацювання |
+| `Lab03Identity.cs` (`input.Password`, `RequiredLength = 10`) | логіка автентифікації | не секрет |
+
+Примітка: резервний рядок використовує порт 54329, а фактичний порт стенда 54330 (`infra/.env`); розбіжність не стосується безпеки, рядок перекривається змінною.
+
 ## 10. Residual risks
 Неперевірені й тимчасово прийняті ризики, відповідальний і наступна дія.
+
+| Ризик | Статус | Відповідальний | Наступна дія |
+|---|---|---|---|
+| Пошук `/api/incidents/search` публічний (без входу) | тимчасово прийнято (вимога варіанта, обмежено лімітом) | автор | розглянути обов'язкову автентифікацію пошуку |
+| Antiforgery не діє при XSS; у Production потрібен HTTPS | прийнято | автор | тримати XSS закритим; при розгортанні TLS із коректними forwarded headers |
+| Немає перевірки `Origin` на сервері як другого шару CSRF | прийнято | автор | можливе покращення |
+| Ліміти (login, search) в пам'яті одного процесу | прийнято | автор | спільне сховище при кількох екземплярах |
+| `AllowedHosts: "*"` у `appsettings.json` | прийнято (локальний навчальний стенд) | автор | задати перелік хостів при розгортанні |
+| Журнал SQL (`EntityFrameworkCore.Database.Command: Information`), значення параметрів приховано | прийнято | автор | знизити рівень у Production |
+| Історія Git не перевірялась на секрети | не перевірено | автор | за потреби перевірити історію |
+| Залежності з новими мажорними версіями (11.x), `xunit` deprecated | прийнято | автор | оновити після переходу на .NET 11 / xunit.v3 |
+
 ## 11. Conclusion
 Лише фактичні результати.
+
+Виправлено дві знахідки (F-01, F-02) з повторною перевіркою; додано ліміт пошуку з незалежними партиціями; фактичний прогін: 47 тестів, 47 пройдено. Вразливих залежностей немає, секретів у відстежуваних файлах немає (є лише відкрите навчальне значення `local-study-password`). Залишкові ризики наведено в розділі 10. Фінальний commit і тег v1.0.0: додати після завершення.
+
 ## 12. Evidence appendix
 Для відмінного: доказ відсутності чутливих даних у логах шести сценаріїв етапу 3, п. 4; обґрунтування пріоритетів findings; відтворювані передумови й retest для іншої людини.
 Шляхи, точні команди, ID сценаріїв, безпечний зв’язок відповіді з записом журналу через traceId; без паролів, cookie, токенів і connection strings.
+
+- Файли доказів: `docs/evidence/l6-tests-final.txt`, `l6-deps-vulnerable.txt`, `l6-deps-deprecated.txt`, `l6-deps-outdated.txt`; скріншоти етапу 6 (`l6-*.png`: Production, заголовки, 500 до/після, журнал, тести).
+- Приклад зв'язку відповіді із записом журналу: невдалий вхід (`POST /api/auth/login`, 401) має в тілі `traceId` `00-3f950df48fb1cc78e4e5a7a70e9dff44-ef17cf8b674e9dc7-00`; у рядку журналу `Auth event login: result failure, trace ...` той самий ідентифікатор. Пароль, cookie і токени в журнал не потрапляють.
+- Відтворюваність: передумови (Docker Compose з PostgreSQL, змінні `SeedUsers__Password`, `ConnectionStrings__SecureLab` ззовні), команди запуску й перевірок наведено в розділах 4, 7, 8, 9 і в кожному файлі `docs/findings/*.md`.
+
 ## Декларація й журнал ШІ
-Використовував/ла / не використовував/ла. Назва сервісу, для чого, що перевірено й змінено автором, власна інтерпретація.
+Використовував. Назва сервісу, для чого, що перевірено й змінено автором, власна інтерпретація.
 
 | Дата | Сервіс | Завдання/фрагмент | Авторська адаптація | Перевірка й результат |
 |---|---|---|---|---|
-| заповнити або не використовував/ла | | | | |
+| 2026-11-18…21 | Claude (Anthropic) | План і пояснення етапів ЛР 6; чернетки `threat-model.md`, `security-review.md`, `F-01`, `F-02`; | Автор виконував усі команди, збирав проєкт і запускав тести, перевіряв виводи й заголовки в терміналі, робив скріншоти, обрав рівень і набір знахідок, ставив уточнювальні запитання, писав фінальний код, який потрапив у репозиторій | 47 тестів з 47 пройдено; залежності перевірено `dotnet list package`; відповіді API перевірено `curl` у Production |
