@@ -4,6 +4,8 @@ using SecureLab.Api.Data.Entities;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Antiforgery;
+using SecureLab.Api.Presentation.Security;
 
 namespace SecureLab.Api.Scaffolding;
 
@@ -20,6 +22,15 @@ public static class Lab03Identity
             options.Password.RequiredLength = 10;
         }).AddEntityFrameworkStores<SecureLabDbContext>().AddDefaultTokenProviders();
         builder.Services.AddAuthorization();
+        builder.Services.AddAntiforgery(options =>
+        {
+            options.HeaderName = CsrfEndpointFilter.HeaderName;
+            options.Cookie.Name = "sl-csrf";
+            options.Cookie.HttpOnly = true;
+            options.Cookie.SameSite = SameSiteMode.Strict;
+            options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+                ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
+        });
         builder.Services.ConfigureApplicationCookie(options =>
         {
             options.Cookie.HttpOnly = true;
@@ -161,7 +172,14 @@ public static class Lab03Identity
         {
             await signIn.SignOutAsync();
             return Results.NoContent();
-        });
+        }).AddEndpointFilter<CsrfEndpointFilter>();
+
+        // Видає antiforgery-токен поточному користувачеві (cookie sl-csrf + токен для заголовка).
+        app.MapGet("/api/auth/csrf", (HttpContext httpContext, IAntiforgery antiforgery) =>
+        {
+            var tokens = antiforgery.GetAndStoreTokens(httpContext);
+            return Results.Ok(new { headerName = CsrfEndpointFilter.HeaderName, token = tokens.RequestToken });
+        }).RequireAuthorization();
 
         app.MapGet("/api/me", GetCurrentUser).RequireAuthorization();
 
