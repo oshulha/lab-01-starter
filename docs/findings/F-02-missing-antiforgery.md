@@ -43,7 +43,7 @@
 - logout без токена: 400, сеанс лишається чинним (`/api/me` повертає 200);
 - logout із токеном: 204.
 
-Фактичний результат прогону: додати з виводу `dotnet test`.
+Фактичний результат: після підключення фільтра 42 тести з 42 (`docs/evidence/l6-16-tests-42-after-f02.png`); фінальний прогін 47 з 47 (`l6-28-tests-47-final.png`, `l6-33-tests-47-passed-list.png`, `l6-tests-final.txt`).
 
 ## Positive regression
 
@@ -58,4 +58,4 @@
 
 ## Доказ
 
-Тести `CsrfRegressionTests.*` (`dotnet test SecureLab.sln -c Release --no-build --filter "FullyQualifiedName~Csrf"`), скріншот результату в docs/evidence/. У журналі відмови видно подію `csrf.rejected` з traceId без токенів і cookie.
+Тести `CsrfRegressionTests.*` (`dotnet test SecureLab.sln -c Release --no-build --filter "FullyQualifiedName~Csrf"`), скріншоти в docs/evidence/ (`l6-16`, `l6-24-prod-csrf-http-500.png`, `l6-25-prod-csrf-log-ssl.png`). У журналі відмови видно подію `csrf.rejected` з traceId без токенів і cookie.

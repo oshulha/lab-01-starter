@@ -1,6 +1,6 @@
 # F-01. Заголовки безпеки відсутні у відповіді 500 (error path)
 
-**Статус:** Fixed (hash виправного коміту додати після commit)  
+**Статус:** Fixed (виправний commit `b055ff1`)  
 **Актив:** браузер користувача, що отримує відповіді API (захист від MIME sniffing, CSP, витоку Referer)  
 **Компонент:** `src/SecureLab.Api/Program.cs`, порядок middleware (`UseExceptionHandler` та middleware заголовків)  
 **Пріоритет:** P3
@@ -31,7 +31,7 @@ Actual: 500 `application/problem+json`; заголовків безпеки не
 
 ## Виправлення
 
-У `Program.cs` middleware заголовків перенесено перед `UseExceptionHandler`, а самі заголовки встановлюються в `Response.OnStarting`, тобто в момент початку відправлення відповіді, вже після очищення заголовків обробником винятків. Тому вони присутні на 200, 401 і 500. Виправний commit: додати.
+У `Program.cs` middleware заголовків перенесено перед `UseExceptionHandler`, а самі заголовки встановлюються в `Response.OnStarting`, тобто в момент початку відправлення відповіді, вже після очищення заголовків обробником винятків. Тому вони присутні на 200, 401 і 500. Виправний commit: `b055ff1`.
 
 ## Retest
 
@@ -47,4 +47,4 @@ Actual: 500 `application/problem+json`; заголовків безпеки не
 
 ## Доказ
 
-Команда з кроку 3; статус 500, traceId відповіді, відсутність `X-Content-Type-Options`, `Content-Security-Policy`, `Referrer-Policy`. Скріншот: docs/evidence/ (додати).
+Команда з кроку 3; статус 500, traceId відповіді, відсутність `X-Content-Type-Options`, `Content-Security-Policy`, `Referrer-Policy`. Скріншоти: `docs/evidence/l6-13-f01-before-500.png` (до), `docs/evidence/l6-14-f01-after-500.png` (після).

@@ -192,7 +192,7 @@ git --no-pager grep -n -i -E "password|secret|apikey|api_key|connectionstring|be
 Для відмінного: доказ відсутності чутливих даних у логах шести сценаріїв етапу 3, п. 4; обґрунтування пріоритетів findings; відтворювані передумови й retest для іншої людини.
 Шляхи, точні команди, ID сценаріїв, безпечний зв’язок відповіді з записом журналу через traceId; без паролів, cookie, токенів і connection strings.
 
-- Файли доказів: `docs/evidence/l6-tests-final.txt`, `l6-deps-vulnerable.txt`, `l6-deps-deprecated.txt`, `l6-deps-outdated.txt`; скріншоти етапу 6 (`l6-*.png`: Production, заголовки, 500 до/після, журнал, тести).
+- Файли доказів: `docs/evidence/l6-tests-final.txt`, `l6-deps-vulnerable.txt`, `l6-deps-deprecated.txt`, `l6-deps-outdated.txt`; скріншоти `l6-01`…`l6-33` (Production `l6-10`/`l6-11`, 500 до/після `l6-13`/`l6-14`, журнал і traceId `l6-26`/`l6-27`, залежності `l6-20`…`l6-23`, тести `l6-28`/`l6-33`, тег і PR `l6-30`…`l6-32`); повний звіт — `docs/Шульга_Лаб6.docx`.
 - Приклад зв'язку відповіді із записом журналу: невдалий вхід (`POST /api/auth/login`, 401) має в тілі `traceId` `00-3f950df48fb1cc78e4e5a7a70e9dff44-ef17cf8b674e9dc7-00`; у рядку журналу `Auth event login: result failure, trace ...` той самий ідентифікатор. Пароль, cookie і токени в журнал не потрапляють.
 - Відтворюваність: передумови (Docker Compose з PostgreSQL, змінні `SeedUsers__Password`, `ConnectionStrings__SecureLab` ззовні), команди запуску й перевірок наведено в розділах 4, 7, 8, 9 і в кожному файлі `docs/findings/*.md`.
 
