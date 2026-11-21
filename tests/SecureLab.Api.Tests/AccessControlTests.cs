@@ -320,6 +320,7 @@ public sealed class AccessControlTests(SecureLabApiFactory factory)
             using (var login = await client.PostAsJsonAsync("/api/auth/login",
                        new { userName = "alice", password = Password() }))
                 Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
+            await client.AddCsrfAsync();
 
             using var denied = await client.PostAsync($"/api/incidents/{id}/triage", null);
             Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);

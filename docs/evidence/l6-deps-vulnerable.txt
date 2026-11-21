@@ -1,0 +1,9 @@
+﻿  Determining projects to restore...
+  Restored C:\Users\user\Desktop\╨Ы╨░╨▒╨╕ ╤В╨░ ╨Я╤А╨░╨║╤В╨╕╤З╨╜╤Ц\7╤Б╨╡╨╝\╨Я╤А╨╕╨в╨╡╤Е╨╜╨Я╤А╨╛╨│╨Т╨Ж╨╜╨С_╨С╨░╨▒╨╡╨╜╨║╨╛\╨Ы╨░╨▒1\lab-01-starter\src\SecureLab.Api\SecureLab.Api.csproj (in 1,13 sec).
+  Restored C:\Users\user\Desktop\╨Ы╨░╨▒╨╕ ╤В╨░ ╨Я╤А╨░╨║╤В╨╕╤З╨╜╤Ц\7╤Б╨╡╨╝\╨Я╤А╨╕╨в╨╡╤Е╨╜╨Я╤А╨╛╨│╨Т╨Ж╨╜╨С_╨С╨░╨▒╨╡╨╜╨║╨╛\╨Ы╨░╨▒1\lab-01-starter\tests\SecureLab.Api.Tests\SecureLab.Api.Tests.csproj (in 1,12 sec).
+
+The following sources were used:
+   https://api.nuget.org/v3/index.json
+
+The given project `SecureLab.Api` has no vulnerable packages given the current sources.
+The given project `SecureLab.Api.Tests` has no vulnerable packages given the current sources.

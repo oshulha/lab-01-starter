@@ -3,6 +3,7 @@ using SecureLab.Api.Application.Incidents;
 using SecureLab.Api.Data;
 using SecureLab.Api.Data.Entities;
 using SecureLab.Api.Presentation.Contracts;
+using SecureLab.Api.Presentation.Security;
 using System.Diagnostics; 
 using System.Security.Claims;
 
@@ -31,13 +32,16 @@ public static class IncidentEndpoints
             .Produces<IReadOnlyList<IncidentSeveritySummaryResponse>>();
 
         group.MapPut("/{id:guid}", UpdateAsync)
-            .WithName("UpdateIncident");
+            .WithName("UpdateIncident")
+            .AddEndpointFilter<CsrfEndpointFilter>();
 
         group.MapDelete("/{id:guid}", DeleteAsync)
-            .WithName("DeleteIncident");
+            .WithName("DeleteIncident")
+            .AddEndpointFilter<CsrfEndpointFilter>();
 
         group.MapPost("/{id:guid}/triage", TriageAsync)
-            .WithName("TriageIncident");
+            .WithName("TriageIncident")
+            .AddEndpointFilter<CsrfEndpointFilter>();
 
         endpoints.MapGet("/api/incident-comments/{id:guid}", GetCommentAsync)
             .WithName("GetIncidentComment")

@@ -2,6 +2,14 @@ const result = document.querySelector("#result");
 const stateText = document.querySelector("#state");
 const profile = document.querySelector("#profile");
 
+// F-02: токен antiforgery для змінюючих запитів (токен прив'язано до поточного сеансу).
+async function csrfHeaders() {
+  const response = await fetch("/api/auth/csrf", { credentials: "same-origin" });
+  if (!response.ok) return {};
+  const { headerName, token } = await response.json();
+  return { [headerName]: token };
+}
+
 // Лише власний origin; cookie надсилається явно, нічого не зберігаємо в storage.
 async function apiFetch(path, options = {}) {
   return fetch(path, { ...options, credentials: "same-origin" });
@@ -93,7 +101,7 @@ document.querySelector("#incident").addEventListener("submit", async event => {
 });
 
 document.querySelector("#logout").addEventListener("click", async () => {
-  const response = await apiFetch("/api/auth/logout", { method: "POST" });
+  const response = await apiFetch("/api/auth/logout", { method: "POST", headers: await csrfHeaders() });
   clearProfile();
   document.querySelector("#incident").reset();
   result.textContent = `Вихід: ${response.status}`;

@@ -4,6 +4,8 @@ using SecureLab.Api.Data.Entities;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Antiforgery;
+using SecureLab.Api.Presentation.Security;
 
 namespace SecureLab.Api.Scaffolding;
 
@@ -11,6 +13,8 @@ public static class Lab03Identity
 {
     public const int LoginPermitLimit = 10;
     public static readonly TimeSpan LoginWindow = TimeSpan.FromSeconds(10);
+    public const int SearchPermitLimit = 20;
+    public static readonly TimeSpan SearchWindow = TimeSpan.FromSeconds(10);
 
     public static void AddLab03Identity(this WebApplicationBuilder builder)
     {
@@ -20,6 +24,15 @@ public static class Lab03Identity
             options.Password.RequiredLength = 10;
         }).AddEntityFrameworkStores<SecureLabDbContext>().AddDefaultTokenProviders();
         builder.Services.AddAuthorization();
+        builder.Services.AddAntiforgery(options =>
+        {
+            options.HeaderName = CsrfEndpointFilter.HeaderName;
+            options.Cookie.Name = "sl-csrf";
+            options.Cookie.HttpOnly = true;
+            options.Cookie.SameSite = SameSiteMode.Strict;
+            options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+                ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
+        });
         builder.Services.ConfigureApplicationCookie(options =>
         {
             options.Cookie.HttpOnly = true;
@@ -50,12 +63,31 @@ public static class Lab03Identity
                         Window = LoginWindow,
                         QueueLimit = 0
                     }));
+            // F-03: окремий ліміт для публічного пошуку. Партиція: автентифікований користувач
+            // (його ідентифікатор) або, для анонімів, IP-адреса; квоти партицій незалежні.
+            options.AddPolicy("search", httpContext =>
+            {
+                var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var partitionKey = userId is not null
+                    ? "user:" + userId
+                    : "ip:" + (httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = SearchPermitLimit,
+                        Window = SearchWindow,
+                        QueueLimit = 0
+                    });
+            });
             options.OnRejected = (context, _) =>
             {
+                var eventType = context.HttpContext.Request.Path.StartsWithSegments("/api/incidents/search")
+                    ? "search" : "login";
                 var logger = context.HttpContext.RequestServices
                     .GetRequiredService<ILoggerFactory>().CreateLogger("Auth");
                 logger.LogWarning("Auth event {EventType}: result {Result}, trace {TraceId}",
-                    "login", "rate_limited", context.HttpContext.TraceIdentifier);
+                    eventType, "rate_limited", System.Diagnostics.Activity.Current?.Id ?? context.HttpContext.TraceIdentifier);
                 return ValueTask.CompletedTask;
             };
         });
@@ -140,7 +172,7 @@ public static class Lab03Identity
             if (string.IsNullOrWhiteSpace(input.UserName) || string.IsNullOrEmpty(input.Password))
             {
                 logger.LogInformation("Auth event {EventType}: result {Result}, trace {TraceId}",
-                    "login", "failure", httpContext.TraceIdentifier);
+                    "login", "failure", System.Diagnostics.Activity.Current?.Id ?? httpContext.TraceIdentifier);
                 return Results.Unauthorized();
             }
 
@@ -148,12 +180,12 @@ public static class Lab03Identity
             if (result.Succeeded)
             {
                 logger.LogInformation("Auth event {EventType}: result {Result}, user {UserName}, trace {TraceId}",
-                    "login", "success", input.UserName, httpContext.TraceIdentifier);
+                    "login", "success", input.UserName, System.Diagnostics.Activity.Current?.Id ?? httpContext.TraceIdentifier);
                 return Results.NoContent();
             }
 
             logger.LogInformation("Auth event {EventType}: result {Result}, trace {TraceId}",
-                "login", "failure", httpContext.TraceIdentifier);
+                "login", "failure", System.Diagnostics.Activity.Current?.Id ?? httpContext.TraceIdentifier);
             return Results.Unauthorized();
         }).RequireRateLimiting("login");
 
@@ -161,7 +193,14 @@ public static class Lab03Identity
         {
             await signIn.SignOutAsync();
             return Results.NoContent();
-        });
+        }).AddEndpointFilter<CsrfEndpointFilter>();
+
+        // Видає antiforgery-токен поточному користувачеві (cookie sl-csrf + токен для заголовка).
+        app.MapGet("/api/auth/csrf", (HttpContext httpContext, IAntiforgery antiforgery) =>
+        {
+            var tokens = antiforgery.GetAndStoreTokens(httpContext);
+            return Results.Ok(new { headerName = CsrfEndpointFilter.HeaderName, token = tokens.RequestToken });
+        }).RequireAuthorization();
 
         app.MapGet("/api/me", GetCurrentUser).RequireAuthorization();
 

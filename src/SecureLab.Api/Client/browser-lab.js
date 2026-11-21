@@ -6,6 +6,14 @@ function renderText(container, text) {
   container.replaceChildren(document.createTextNode(text));
 }
 
+// F-02: токен antiforgery для змінюючих запитів (токен прив'язано до поточного сеансу).
+async function csrfHeaders() {
+  const response = await fetch("/api/auth/csrf", { credentials: "same-origin" });
+  if (!response.ok) return {};
+  const { headerName, token } = await response.json();
+  return { [headerName]: token };
+}
+
 async function load() {
   const response = await fetch(`/api/incidents/${id()}`);
   status.textContent = `GET: ${response.status}`;
@@ -24,7 +32,7 @@ async function load() {
 document.querySelector("#load").addEventListener("click", load);
 document.querySelector("#edit").addEventListener("submit", async event => {
   event.preventDefault();
-  const response = await fetch("/api/incidents", { method: "POST", headers: { "Content-Type": "application/json" },
+  const response = await fetch("/api/incidents", { method: "POST", headers: { "Content-Type": "application/json", ...(await csrfHeaders()) },
     body: JSON.stringify({ title: event.currentTarget.elements.title.value, description: event.currentTarget.elements.description.value,
       severity: "Low", occurredAtUtc: new Date().toISOString() }) });
   status.textContent = `POST: ${response.status}`;
